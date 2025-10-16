@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Project Kanban Board
+    url: https://github.com/<your-username>/GPTBuddyAI/projects
+    about: Review existing work before filing a new issue.
+  - name: Documentation Portal
+    url: https://github.com/<your-username>/GPTBuddyAI/tree/main/docs
+    about: Check current documentation to avoid duplicates.
