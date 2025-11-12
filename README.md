@@ -2,66 +2,93 @@
 
 GPTBuddyAI is a privacy-preserving analytics toolkit that turns exported AI chat archives into actionable insights. The project stitches together local language models, vector search, and a lightweight UI so you can summarize, tag, and explore your historical GPT conversations without sending data to the cloud. The repository ships with an opinionated roadmap, automation scripts, and GitHub project guidance so you can spin up a complete workflow—from ingestion through deployment on a Raspberry Pi—in roughly two weeks.
 
+**New:** The toolkit now supports building a **comprehensive study and Q&A experience** by ingesting the **NIST SP 800** series and **IAPP** PDFs alongside your OpenAI export. You can generate citation-rich answers, synthesize study guides, and optionally fine-tune a small local LLM on Apple Silicon, with the option to convert to **Core ML** for on-device apps.
+
 ## Why GPTBuddyAI?
 - Work entirely offline to keep sensitive conversations private.
 - Rapidly surface trends, tags, and summaries across thousands of chats.
 - Use semantic search and visualizations to rediscover past ideas.
 - Deploy the full stack (data pipeline, embeddings, UI, and vector store) on modest hardware.
+- **Compliance/Study Mode:** Ask questions across **OpenAI chats + NIST SP 800 + IAPP PDFs** with grounded, cited answers and auto-generated study notes.
 
 ## Core Features
 - **Data ingestion & cleaning**: Parse OpenAI `conversations.json`, normalize metadata, and persist to SQLite or Parquet for reproducible downstream processing.
-- **Summarization & tagging**: Leverage LM Studio or another local LLM runner to generate concise summaries, tags, and entities for each conversation.
+- **Multi-corpus ingestion (new)**: Structured PDF parsing for **NIST SP 800** and **IAPP** materials with page-level provenance for citations.
+- **Summarization & tagging**: Leverage MLX-LM or a local LLM runner to generate concise summaries, tags, and entities per conversation or document.
 - **Embedding pipeline**: Build dense vector representations with `sentence-transformers` and manage similarity search with Faiss or Chroma.
+- **RAG Q&A (new)**: Retrieval-augmented generation over all corpora with inline citations and confidence/traceability metadata.
+- **Study-guide synthesis (new)**: Auto-compose outlines, flashcards, and quick-reference sheets for exam prep and team enablement.
+- **Apple Silicon first (new)**: Optional **MLX-LM** LoRA fine-tuning on-device and export to **Core ML** for Mac/iOS demos.
 - **Interactive UI**: Ship a Streamlit or Gradio app featuring keyword + semantic search, filters, timeline charts, and detailed conversation drill-downs.
 - **Deployment**: Containerize services and orchestrate them with Docker Compose on a Raspberry Pi, including watchdog scripts for headless operation.
 - **Project operations**: GitHub Kanban workflow, templated issues, and documentation guardrails to keep the project moving smoothly.
 
 ## Reference Architecture
 ```
-┌─────────────────────┐      ┌──────────────────────┐
-│ OpenAI Export (.zip)│      │  Metadata Catalog    │
-└──────────┬──────────┘      └──────────┬───────────┘
-           │                            │
-           ▼                            ▼
- ┌──────────────────┐         ┌──────────────────────┐
- │ Data Ingestion & │  ETL    │ Summaries & Tagging  │
- │   Cleaning       │ ───────▶│ (LM Studio / LLM API)│
- └────────┬─────────┘         └──────────┬───────────┘
-          │                              │
-          ▼                              ▼
- ┌──────────────────┐         ┌──────────────────────┐
- │   SQLite /       │         │  Embedding Pipeline  │
- │   Parquet Store  │◀────────│ (sentence-transformers│
- └────────┬─────────┘  Vectors└──────────┬───────────┘
-          │                              │
-          ▼                              ▼
- ┌──────────────────┐         ┌──────────────────────┐
- │  Streamlit /     │◀────────│ Vector DB (Faiss/    │
- │  Gradio UI       │  Search │ Chroma / Qdrant)     │
- └────────┬─────────┘         └──────────┬───────────┘
-          │                              │
-          ▼                              ▼
- ┌──────────────────┐         ┌──────────────────────┐
- │ Analytics /      │         │ Deployment Targets   │
- │ Visualizations   │         │ (Docker + Raspberry Pi)│
- └──────────────────┘         └──────────────────────┘
+               ┌───────────────────────┐
+               │  OpenAI Export (.zip) │
+               └──────────┬────────────┘
+                          │
+     ┌────────────────────┼─────────────────────┐
+     │                    │                     │
+     ▼                    ▼                     ▼
+┌─────────────┐     ┌─────────────┐       ┌─────────────┐
+│  NIST SP800 │     │    IAPP     │       │ Other PDFs  │ (optional)
+│     PDFs    │     │    PDFs     │       └─────────────┘
+└─────┬───────┘     └─────┬───────┘
+      │                   │
+      └──────────┬────────┘
+                 ▼
+       ┌───────────────────────┐
+       │ Ingestion & Cleaning  │  (PDF/JSON → structured text + metadata)
+       └──────────┬────────────┘
+                  ▼
+         ┌─────────────────┐
+         │  Vectorization  │  (sentence-transformers)
+         └────────┬────────┘
+                  ▼
+        ┌────────────────────┐
+        │ Vector DB (Faiss/  │
+        │  Chroma/Qdrant)    │
+        └────────┬───────────┘
+                 ▼
+     ┌──────────────────────────────┐
+     │ RAG Q&A + Study Guide Synth  │  (citations, flashcards, outlines)
+     └────────┬─────────────────────┘
+              ▼
+     ┌──────────────────────────────┐
+     │ Local LLM Runtime            │  MLX-LM / LM Studio
+     └────────┬─────────────────────┘
+              ▼
+     ┌──────────────────────────────┐
+     │    UI (Streamlit/Gradio)     │
+     └──────────────────────────────┘
+
+(Optional path for productization)
+Local LLM/LoRA  ──► Core ML convert ──► Swift/macOS or iOS app
 ```
 
 ## Project Structure
 ```
 GPTBuddyAI/
-├── .github/
-│   └── ISSUE_TEMPLATE/
-│       ├── bug_report.md
-│       ├── feature_request.md
-│       ├── task.md
-│       └── config.yml
+├── data/
+│   ├── openai/          # OpenAI chat export (JSON/zip)
+│   ├── nist/            # NIST SP 800 PDFs
+│   └── iapp/            # IAPP PDFs (licensed; keep private)
+├── artifacts/
+│   ├── embeddings/      # Numpy/Parquet embeddings
+│   └── index/           # Vector DB persistence (Chroma/Faiss)
+├── src/
+│   ├── ingest/          # ingest_openai.py, ingest_pdfs.py
+│   ├── rag/             # build_index.py, query.py, study_guide.py
+│   ├── llm/             # mlx_finetune.py, coreml_export.py (optional)
+│   └── ui/              # streamlit_app.py or gradio_app.py
 ├── docs/
-│   ├── kanban-board.md        # Board columns, swimlanes, WIP policies, and usage tips
-│   ├── issue-backlog.md       # Copy/paste issue seeds aligned to roadmap
-│   ├── operations-playbook.md # Deployment, monitoring, and automation checklists
-│   └── roadmap.md             # Two-week MVP plan with milestones and deliverables
-├── workflows/                 # Reserved for future CI/CD pipelines (e.g., GitHub Actions)
+│   ├── kanban-board.md
+│   ├── issue-backlog.md
+│   ├── operations-playbook.md
+│   └── roadmap.md
+├── workflows/           # future CI/CD (e.g., nightly ETL check)
 ├── .gitignore
 └── README.md
 ```
@@ -77,19 +104,86 @@ GPTBuddyAI/
    python -m venv .venv
    source .venv/bin/activate
    pip install --upgrade pip
-   pip install -r requirements.txt  # create this from docs/operations-playbook.md guidance
    ```
-3. **Install project tooling**:
-   - LM Studio (macOS app) with a GGUF model such as `mistral-7b-instruct` or `deepseek-r1`.
-   - Docker Desktop (for local builds) and/or Docker Engine on Raspberry Pi.
-   - Optional: JupyterLab for rapid experimentation.
-4. **Configure environment variables** in a `.env` file (not committed):
+3. **Install project dependencies**:
+   ```bash
+   # Core stack
+   pip install -r requirements.txt  # (create from docs/operations-playbook.md)
+   # or explicitly:
+   pip install sentence-transformers chromadb faiss-cpu pypdf pymupdf unstructured[all-docs]                streamlit gradio
+
+   # Local LLM options
+   pip install mlx-lm               # Apple MLX runtime + simple finetune utilities
+   pip install coremltools          # Optional: export to Core ML for Apple platforms
+   # Optional alternative runtime:
+   # - LM Studio (macOS app) + a local GGUF model like mistral-7b-instruct
+   ```
+4. **Install platform tooling**:
+   - **macOS**: Xcode Command Line Tools, Homebrew (for cmake/pkg-config if needed).
+   - **Docker Desktop** (local builds) or Docker Engine on Raspberry Pi.
+   - Optional: **JupyterLab** for quick experiments.
+5. **Configure environment variables** in a `.env` file (not committed):
    ```dotenv
    DATA_DIR=~/data/gptbuddyai
-   LM_STUDIO_API=http://localhost:1234/v1
-   VECTOR_BACKEND=faiss  # or chroma
-   STREAMLIT_AUTH_TOKEN=change-me
+   DATA_OPENAI=./data/openai
+   DATA_NIST=./data/nist
+   DATA_IAPP=./data/iapp
+
+   VECTOR_BACKEND=chroma                 # or faiss
+   VECTOR_PERSIST=./artifacts/index
+
+   LM_RUNTIME=mlx                        # mlx | lmstudio
+   LM_STUDIO_API=http://localhost:1234/v1  # if LM_RUNTIME=lmstudio
+
+   RAG_CHUNK_SIZE=800
+   RAG_CHUNK_OVERLAP=120
    ```
+
+## Data Preparation
+- **OpenAI export**: Drop the downloaded `.json`/folder into `data/openai/`.
+- **NIST SP 800**: Place official PDFs in `data/nist/` (final publications preferred).
+- **IAPP**: Place your licensed PDFs in `data/iapp/`. Keep usage internal; do not redistribute.
+
+> **Licensing note:** NIST publications are generally public domain; IAPP materials are proprietary and should remain private and unshared.
+
+## Ingestion & Indexing
+Typical sequence (scripts live under `src/`):
+
+```bash
+# 1) Parse OpenAI export → normalized records
+python src/ingest/ingest_openai.py --in $DATA_OPENAI --out ./artifacts/openai.parquet
+
+# 2) Parse PDFs (NIST/IAPP) → structured text with metadata (page, section, source)
+python src/ingest/ingest_pdfs.py --nist $DATA_NIST --iapp $DATA_IAPP --out ./artifacts/docs.parquet
+
+# 3) Build or refresh embeddings + vector index
+python src/rag/build_index.py --inputs ./artifacts/*.parquet --persist $VECTOR_PERSIST
+```
+
+## Ask Questions & Generate Study Guides
+- **Ad-hoc query with citations**:
+  ```bash
+  python src/rag/query.py --q "Summarize AC-2 in NIST 800-53r5 and list key controls." --topk 6
+  ```
+- **Study-guide synthesis** (outline + flashcards from top-k context):
+  ```bash
+  python src/rag/study_guide.py --topic "IAPP privacy principles vs. NIST access controls" --pages 2
+  ```
+
+Both scripts retrieve relevant chunks from the vector DB and then call a **local LLM**:
+- **Default**: `mlx-lm` model (e.g., `mlx-community/SmolLM2-1.7B-Instruct-4bit`)
+- **Alternate**: LM Studio via `LM_STUDIO_API`.
+
+## Optional: Apple-Native Fine-Tuning & Core ML Export
+- **Light LoRA on Apple Silicon** to align tone/format for compliance Q&A:
+  ```bash
+  mlx_lm.finetune     --model mlx-community/SmolLM2-1.7B-Instruct-4bit     --train-data ./artifacts/sft.jsonl     --lora-rank 8 --batch-size 8 --epochs 3 --lr 2e-4     --save-adapter ./artifacts/lora
+  ```
+- **Core ML export** (prototype path; details vary by base model):
+  ```bash
+  python src/llm/coreml_export.py --in ./artifacts/model --out ./artifacts/StudyKit-LLM.mlpackage
+  ```
+Use the Core ML package in a Swift macOS/iOS demo for fully on-device inference.
 
 ## GitHub Repository Setup
 Use these steps the first time you publish the project:
@@ -98,7 +192,15 @@ Use these steps the first time you publish the project:
 mv GPTBuddyAI ~/Projects  # optional relocation
 cd GPTBuddyAI
 git init
-printf "#.venv\n__pycache__/\n*.pyc\n.env\n*.egg-info/\ndist/\nbuild/\n.DS_Store\n" > .gitignore
+printf "#.venv
+__pycache__/
+*.pyc
+.env
+*.egg-info/
+dist/
+build/
+.DS_Store
+" > .gitignore
 git add .
 git commit -m "chore: bootstrap GPTBuddyAI repo"
 git remote add origin git@github.com:<your-username>/GPTBuddyAI.git
@@ -121,55 +223,62 @@ git push -u origin main
 5. Automate board hygiene with weekly `gh projectitem-update` job (workflow stub in `workflows/`).
 
 ## Seed Issues
-Replicate the following backlog (copy from `docs/issue-backlog.md`). Suggested labels: `area:data`, `area:llm`, `area:ui`, `priority:P0/P1/P2`, `type:feature`, `type:task`, `type:doc`.
-
 | Title | Description | Priority | Labels |
 | --- | --- | --- | --- |
-| Data Parsing Pipeline | Stand up the ingestion module to load `conversations.json`, normalize fields, and persist to SQLite. Include unit tests for malformed records. | P0 | `area:data`, `type:feature` |
-| Summarization Workflow | Integrate LM Studio API, craft prompts for conversation summarization, and store outputs alongside metadata. | P0 | `area:llm`, `type:feature` |
-| Embedding Store | Generate sentence-transformer embeddings, stand up Faiss/Chroma index, and expose semantic search helpers. | P1 | `area:data`, `type:feature` |
-| UI Skeleton | Prototype Streamlit UI with list, detail, and search components. Wire to mock data. | P1 | `area:ui`, `type:feature` |
-| Deployment Baseline | Write Dockerfiles/Compose for API, UI, and vector services; smoke test on Raspberry Pi. | P1 | `area:ops`, `type:task` |
-| Analytics Dashboards | Produce time-series charts and embed them in the UI. | P2 | `area:ui`, `type:feature` |
-| Documentation | Maintain setup guides and architecture notes in Joplin + `docs/`. | P2 | `type:doc` |
+| Data Parsing Pipeline | Load `conversations.json`, normalize fields, and persist to SQLite/Parquet. Include unit tests for malformed records. | P0 | `area:data`, `type:feature` |
+| PDF Ingestion (NIST/IAPP) | Robust PDF → structured text with page/section metadata; provenance preserved for citations. | P0 | `area:data`, `type:feature` |
+| RAG Index & Retrieval | Build embeddings, stand up Faiss/Chroma, implement hybrid search and top-k reranking. | P0 | `area:data`, `type:feature` |
+| Q&A Service | Expose a RAG endpoint with citation payloads and confidence. | P1 | `area:llm`, `type:feature` |
+| Study-Guide Generator | Outline + flashcards from retrieved context; export to Markdown/PDF. | P1 | `area:llm`, `type:feature` |
+| Local LLM Runtime | Wire MLX-LM default model; fallback to LM Studio if configured. | P1 | `area:llm`, `type:feature` |
+| LoRA Fine-Tune (Optional) | Prepare `sft.jsonl` from Q↔A transcripts; run LoRA on Apple Silicon. | P2 | `area:llm`, `type:feature` |
+| Core ML Demo (Optional) | Convert model to Core ML and build a minimal Swift app (macOS). | P2 | `area:ops`, `type:task` |
+| UI Skeleton | Streamlit/Gradio search + detail + study-guide views; cite sources inline. | P1 | `area:ui`, `type:feature` |
+| Deployment Baseline | Dockerfiles/Compose for API, UI, vector DB; smoke test on Raspberry Pi. | P1 | `area:ops`, `type:task` |
+| Analytics Dashboards | Time-series charts and usage analytics embedded in the UI. | P2 | `area:ui`, `type:feature` |
+| Documentation | Maintain setup guides and architecture notes in `docs/`. | P2 | `type:doc` |
 
 ## Two-Week MVP Roadmap
-Timeline assumes Day 1 is the repository kickoff. Adjust dates in `docs/roadmap.md` to match your calendar.
-- **Days 1–2 – Setup & Data Ingestion**
-  - Initialize repo, stand up virtual env, parse `conversations.json`, publish stats.
+- **Days 1–2 – Setup & Multi-Corpus Ingestion**
+  - Initialize repo/venv, finalize `.env`, ingest OpenAI export, NIST SP 800 PDFs, and IAPP PDFs.
   - Enable Kanban board, labels, and issue templates.
 - **Days 3–4 – Summaries & Tagging**
-  - Install LM Studio, iterate on prompts, batch-generate summaries/tags.
+  - Install LM runtime (MLX-LM or LM Studio); iterate on prompts; batch-generate summaries/tags.
 - **Days 5–6 – Embeddings & Vector Index**
-  - Train/test embeddings, evaluate semantic search accuracy on sample queries.
-- **Days 7–9 – UI Skeleton & Visualization**
-  - Implement Streamlit or Gradio app with search, filters, timeline charts.
-- **Days 10–11 – Deployment & Testing**
-  - Containerize services, deploy to Raspberry Pi, validate performance.
-- **Days 12–14 – Polish & Demo**
-  - Harden pipelines, refine UI, capture demo artifacts, update docs.
+  - Create embeddings; evaluate retrieval on a test set (NIST controls, IAPP principles).
+- **Days 7–9 – RAG Q&A + UI Skeleton**
+  - Implement Q&A with citations; wire UI (search, filters, doc viewer).
+- **Days 10–11 – Study-Guide Synth + Evaluation**
+  - Generate outlines/flashcards; manual QA against known answers.
+- **Days 12–14 – Deployment & Polish**
+  - Containerize, smoke test on Raspberry Pi; refine prompts, performance, and docs.
 
 ## Documentation & Operational Playbook
-- `docs/roadmap.md`: Expandable schedule with milestones, deliverable definition, and entry/exit criteria per phase.
-- `docs/kanban-board.md`: Board column definitions, WIP policies, swimlanes, automation suggestions.
-- `docs/issue-backlog.md`: Copy-ready issues with acceptance criteria to seed GitHub.
-- `docs/operations-playbook.md`: Environment variables, deployment commands, monitoring tips, and rollback plans.
+- `docs/roadmap.md`: Milestones and acceptance criteria per phase.
+- `docs/kanban-board.md`: Board definitions, WIP policies, and automation tips.
+- `docs/issue-backlog.md`: Copy-ready issues with acceptance criteria.
+- `docs/operations-playbook.md`: Environment variables, ingestion/run commands, monitoring tips, and rollback plans. Include licensing reminders for IAPP materials.
 
 ## Automation Hooks
-- Placeholder directory `workflows/` for GitHub Actions (e.g., nightly ETL smoke test, dependency audit).
-- Future scripts: `scripts/bootstrap_data.sh`, `scripts/run_vector_tests.py`, `scripts/deploy_pi.sh` (documented in `operations-playbook.md`).
+- `workflows/` reserved for GitHub Actions (e.g., nightly ETL smoke test, dependency audit).
+- Future scripts:
+  - `scripts/bootstrap_data.sh` – create folders, verify `.env`, quick sanity checks.
+  - `scripts/run_vector_tests.py` – retrieval quality harness.
+  - `scripts/deploy_pi.sh` – Compose deployment and health checks.
 
 ## Contribution Guidelines (Draft)
 - Prefer feature branches named `feature/<short-desc>`.
 - Require PR review + CI green before merging to `main`.
-- Document prompt changes and model versions in `docs/changelog.md` (to be created).
+- Document prompt changes and model versions in `docs/changelog.md`.
 - Follow semantic commit messages (`type(scope): summary`).
 
 ## Licensing
-Select a license that matches your distribution goals (e.g., MIT, Apache-2.0). Add `LICENSE` before first public release.
+Choose a license that matches your distribution goals (e.g., MIT, Apache-2.0). Add `LICENSE` before first public release.
+- **Data**: Keep IAPP content private and non-redistributable. NIST publications are generally public domain; verify specific documents.
 
 ---
 **Next Steps**
-1. Populate `docs/` files (templates committed below) with project-specific details.
-2. Create GitHub repository `GPTBuddyAI`, push this scaffold, and configure the project board.
-3. Begin Day-1 tasks from the roadmap to build momentum toward the MVP.
+1. Drop your OpenAI export and PDFs into `data/` as noted above.
+2. Wire `.env` and run the ingestion/index scripts.
+3. Spin up the UI and test questions across all corpora; iterate on prompts and chunking parameters.
+4. (Optional) Try LoRA on MLX-LM; if you like the results, export to Core ML and demo a Swift app.

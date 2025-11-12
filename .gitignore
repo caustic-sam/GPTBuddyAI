@@ -1,31 +1,24 @@
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-
-# Environments
-.env
+*.pyc
 .venv/
-.env*/
+.env
+.DS_Store
 
-# Packaging
+# Build & dist
 build/
 dist/
 *.egg-info/
 
-# Jupyter
-.ipynb_checkpoints/
+# Data & artifacts (keep vector index & embeddings out of git)
+data/openai/
+data/nist/
+data/iapp/
+artifacts/
+store/
 
-# OS Artifacts
-.DS_Store
-Thumbs.db
-
-# Logs
-logs/
-*.log
-
-# Data Dumps
-/data/
-*.sqlite
-*.db
-*.jsonl
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json

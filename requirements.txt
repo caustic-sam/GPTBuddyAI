@@ -1,0 +1,26 @@
+# Core utilities
+numpy>=1.26
+pandas>=2.2
+tqdm>=4.66
+rich>=13.7
+python-dotenv>=1.0
+
+# Parsing
+pypdf>=4.0
+pymupdf>=1.24
+unstructured[all-docs]>=0.15
+
+# Embeddings / RAG
+sentence-transformers>=3.0
+chromadb>=0.5
+llama-index-core>=0.10
+faiss-cpu>=1.8.0
+pyarrow>=14.0
+
+# Local LLM
+mlx-lm>=0.21
+coremltools>=7.0
+
+# Optional UI
+streamlit>=1.36
+gradio>=4.36
