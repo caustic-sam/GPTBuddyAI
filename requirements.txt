@@ -24,3 +24,7 @@ coremltools>=7.0
 # Optional UI
 streamlit>=1.36
 gradio>=4.36
+
+# Testing
+pytest>=8.0
+pytest-cov>=4.1
