@@ -54,7 +54,20 @@ def main():
             doc_id = f"r{idx}-c{len(ids)}"
             ids.append(doc_id)
             docs.append(chunk)
-            metas.append({"source": row.get("source"), "page": int(row.get("page")) if row.get("page") else None})
+            # Handle page number safely (may be NaN) - use 0 as default to avoid ChromaDB None rejection
+            page_val = row.get("page")
+            page_num = 0
+            if pd.notna(page_val):
+                try:
+                    page_num = int(page_val)
+                except (ValueError, TypeError):
+                    page_num = 0
+
+            # Handle source safely - ChromaDB rejects None values
+            source_val = row.get("source")
+            source_str = str(source_val) if source_val is not None and pd.notna(source_val) else "unknown"
+
+            metas.append({"source": source_str, "page": page_num})
             # embed per chunk
             emb = model.encode([chunk])[0].tolist()
             embs.append(emb)

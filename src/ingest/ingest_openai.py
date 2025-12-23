@@ -12,7 +12,14 @@ def flatten_mapping(mapping):
         content = ""
         if msg.get("content"):
             if isinstance(msg["content"], dict) and msg["content"].get("parts"):
-                content = "\n".join(msg["content"]["parts"])
+                # Handle parts that might be strings or dicts
+                parts = []
+                for part in msg["content"]["parts"]:
+                    if isinstance(part, str):
+                        parts.append(part)
+                    elif isinstance(part, dict):
+                        parts.append(json.dumps(part))
+                content = "\n".join(parts)
             elif isinstance(msg["content"], str):
                 content = msg["content"]
         rows.append({
@@ -78,6 +85,11 @@ def main():
         df["text"] = df["content"].astype(str)
     else:
         df["text"] = ""
+
+    # Convert metadata dict to JSON string to avoid Parquet struct issues
+    if "metadata" in df.columns:
+        df["metadata"] = df["metadata"].apply(lambda x: json.dumps(x) if isinstance(x, dict) else str(x))
+
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(out, index=False)
