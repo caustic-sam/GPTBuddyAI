@@ -40,11 +40,15 @@
 ### Phase 2: Core RAG + UI Polish (Dec 23-26) - Days 3-6
 **Milestone**: Beautiful, functional UI with working RAG
 
-#### Dec 23
-- [ ] Build ChromaDB vector index
-- [ ] Implement query.py with citations
-- [ ] Wire Streamlit UI to RAG backend
-- [ ] Apply Nordic theme CSS
+#### Dec 23 ✅ COMPLETED
+- [x] Build ChromaDB vector index (60,310 chunks)
+- [x] Implement query.py with citations (test_rag_query.py)
+- [x] Wire Streamlit UI to RAG backend (tabbed interface)
+- [x] Apply Nordic theme CSS (complete)
+- [x] **BONUS**: Topic discovery (25 clusters)
+- [x] **BONUS**: NIST expansion (13 → 337 documents)
+- [x] **BONUS**: Bulk ingestion pipeline (parallel processing)
+- [x] **BONUS**: Interactive topic browser component
 
 #### Dec 24
 - [ ] Analytics dashboard implementation
