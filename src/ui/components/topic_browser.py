@@ -47,6 +47,20 @@ def load_cluster_labels():
         st.info(f"💡 Check file permissions for: {label_file}")
         return {}
 
+def load_cluster_analysis():
+    """Load detailed cluster analysis with keywords and samples"""
+    analysis_file = Path("artifacts/cluster_analysis.json")
+
+    if not analysis_file.exists():
+        return None
+
+    try:
+        with open(analysis_file) as f:
+            return json.load(f)
+    except Exception as e:
+        st.warning(f"Could not load cluster analysis: {e}")
+        return None
+
 def load_conversation_data():
     """Load OpenAI conversation data with error handling"""
     parquet_file = Path("artifacts/openai.parquet")
@@ -120,48 +134,111 @@ def render_topic_clusters():
     else:
         st.info("🔄 Run topic discovery to generate the map: `python src/analytics/topic_discovery.py`")
 
+def render_semantic_topics():
+    """Render semantic topic breakdown with keywords and sample messages"""
+    st.markdown("### 🏷️ Semantic Topic Breakdown")
+
+    # Load cluster analysis
+    cluster_analysis = load_cluster_analysis()
+    labels = load_cluster_labels()
+
+    if not cluster_analysis:
+        st.info("🔄 Generating topic analysis...")
+        st.code("# This was just generated! Refresh the page to see results", language="bash")
+        return
+
+    # Sort clusters by size (largest first)
+    sorted_clusters = sorted(
+        cluster_analysis.items(),
+        key=lambda x: x[1]['size'],
+        reverse=True
+    )
+
+    # Display overview statistics
+    total_messages = sum(info['size'] for _, info in sorted_clusters)
+    st.metric("Total Clustered Messages", f"{total_messages:,}", help="Messages analyzed and grouped by topic")
+
+    st.markdown("---")
+
+    # Display each cluster
+    for cluster_id, info in sorted_clusters[:15]:  # Show top 15 clusters
+        size = info['size']
+        keywords = info.get('keywords', [])
+        samples = info.get('representative_messages', [])
+        label = info.get('label', f"Topic {cluster_id}")
+
+        # Calculate percentage
+        pct = (size / total_messages * 100) if total_messages > 0 else 0
+
+        # Create expander for each topic
+        with st.expander(f"**{label}** — {size} messages ({pct:.1f}%)", expanded=False):
+
+            # Keywords section
+            if keywords:
+                st.markdown("**🔑 Keywords:**")
+                keyword_badges = " • ".join([f"`{kw}`" for kw in keywords])
+                st.markdown(keyword_badges)
+                st.markdown("")
+
+            # Sample messages
+            if samples:
+                st.markdown("**💬 Representative Messages:**")
+                for i, msg in enumerate(samples[:3], 1):  # Show top 3
+                    # Truncate long messages
+                    display_msg = msg[:200] + "..." if len(msg) > 200 else msg
+                    st.markdown(f"{i}. *\"{display_msg}\"*")
+
+                if len(samples) > 3:
+                    st.caption(f"*...and {len(samples) - 3} more similar messages*")
+
+    # Show remaining clusters summary
+    if len(sorted_clusters) > 15:
+        remaining = len(sorted_clusters) - 15
+        remaining_size = sum(info['size'] for _, info in sorted_clusters[15:])
+        st.markdown("---")
+        st.caption(f"*+ {remaining} more topics with {remaining_size} messages*")
+
 def render_cluster_selector():
-    """Interactive cluster selection and exploration"""
-    st.markdown("### 🔍 Explore Topics")
+    """Interactive cluster selection for detailed exploration"""
+    st.markdown("### 🔍 Deep Dive into a Topic")
 
     labels = load_cluster_labels()
 
     if not labels:
-        st.warning("Run cluster labeling first: `python src/analytics/label_clusters.py`")
+        st.info("🔄 Topic labels being generated...")
+        return
 
-        # Temporary manual labels for demo
-        labels = {
-            "0": "AI/AGI Ethics & Regulation",
-            "2": "Digital Identity & Privacy",
-            "3": "Privacy Threats & Solutions",
-            "7": "CBDC & Digital Policy",
-            "1": "Python Development",
-            "14": "DevOps & System Admin",
-            "15": "Video Processing Projects",
-            "4": "Writing & Content Style",
-            "6": "Academic Research",
-        }
-
-    # Create dropdown
-    cluster_options = {f"Cluster {k}: {v}": k for k, v in labels.items()}
-    selected = st.selectbox("Select a topic to explore:", options=list(cluster_options.keys()))
+    # Create dropdown sorted by cluster ID
+    cluster_options = {f"Topic {k}: {v}": k for k, v in sorted(labels.items(), key=lambda x: int(x[0]))}
+    selected = st.selectbox("Select a topic to explore in detail:", options=list(cluster_options.keys()))
 
     if selected:
         cluster_id = cluster_options[selected]
-        st.markdown(f"**Selected**: {selected}")
+        cluster_analysis = load_cluster_analysis()
 
-        # TODO: Load and display sample messages from this cluster
-        st.info("💡 This will show sample messages from your conversations in this topic cluster")
+        if cluster_analysis and cluster_id in cluster_analysis:
+            info = cluster_analysis[cluster_id]
 
-        # Placeholder for sample messages
-        with st.expander("📝 Sample Messages (Coming Soon)", expanded=False):
-            st.markdown("""
-            This feature will display:
-            - Top 10 representative messages from this cluster
-            - Date range when you explored this topic
-            - Related clusters
-            - Export option
-            """)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Messages in Topic", info['size'])
+            with col2:
+                st.metric("Keywords Extracted", len(info.get('keywords', [])))
+
+            # Keywords
+            if info.get('keywords'):
+                st.markdown("**🔑 Keywords:**")
+                st.write(" • ".join([f"`{kw}`" for kw in info['keywords']]))
+
+            # Sample messages
+            if info.get('representative_messages'):
+                st.markdown("**💬 Sample Messages:**")
+                for i, msg in enumerate(info['representative_messages'][:5], 1):
+                    with st.container():
+                        st.markdown(f"**Message {i}:**")
+                        st.text_area("", msg, height=100, key=f"msg_{cluster_id}_{i}", disabled=True)
+        else:
+            st.info("💡 Detailed analysis for this topic is being processed...")
 
 def render_volume_chart():
     """Render conversation volume over time with interactive filters"""
@@ -246,12 +323,17 @@ def render_topic_browser():
 
         st.markdown("---")
 
-        # Topic clusters
+        # Topic clusters visualization
         render_topic_clusters()
 
         st.markdown("---")
 
-        # Cluster selector
+        # NEW: Semantic topic breakdown
+        render_semantic_topics()
+
+        st.markdown("---")
+
+        # Deep dive selector
         render_cluster_selector()
 
         st.markdown("---")

@@ -40,7 +40,7 @@ def render_agent_workflows():
         [
             "Compliance Gap Analysis",
             "Research Synthesis",
-            "Custom Workflow (Coming Soon)"
+            "Custom Multi-Agent Workflow"
         ]
     )
 
@@ -294,8 +294,48 @@ def display_compliance_results(results: dict):
             )
 
     with col2:
-        if st.button("📑 Generate PDF Report (Coming Soon)"):
-            st.info("PDF export will be available in Day 4 deliverables")
+        # Create markdown preview
+        md_preview = create_compliance_markdown_report(summary, classification, recommendations)
+        st.download_button(
+            label="📄 Download Markdown Report",
+            data=md_preview,
+            file_name=f"compliance_report_{int(time.time())}.md",
+            mime="text/markdown"
+        )
+
+
+def create_compliance_markdown_report(summary, classification, recommendations):
+    """Generate markdown report from compliance analysis"""
+    report = "# NIST Compliance Gap Analysis Report\n\n"
+    report += f"**Generated:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    report += "---\n\n"
+
+    # Summary section
+    report += "## Executive Summary\n\n"
+    for key, value in summary.items():
+        report += f"- **{key.replace('_', ' ').title()}:** {value}\n"
+    report += "\n"
+
+    # Classification section
+    report += "## Control Classification\n\n"
+    for status, controls in classification.items():
+        report += f"### {status.title()} ({len(controls)} controls)\n\n"
+        for control in controls[:10]:  # Show first 10
+            report += f"- {control}\n"
+        if len(controls) > 10:
+            report += f"- *...and {len(controls) - 10} more*\n"
+        report += "\n"
+
+    # Recommendations section
+    report += "## Remediation Recommendations\n\n"
+    for i, rec in enumerate(recommendations[:10], 1):
+        report += f"### {i}. {rec.get('control', 'N/A')}\n\n"
+        report += f"**Priority:** {rec.get('priority', 'N/A')}\n\n"
+        report += f"**Recommendation:** {rec.get('recommendation', 'N/A')}\n\n"
+        report += f"**Effort Estimate:** {rec.get('effort', 'N/A')}\n\n"
+        report += "---\n\n"
+
+    return report
 
 
 def render_research_workflow():
@@ -563,14 +603,193 @@ def display_research_results(research_result, synthesis_result):
 
 
 def render_custom_workflow():
-    """Custom workflow builder UI (stub)"""
-    st.markdown("### 🛠️ Custom Workflow Builder")
-    st.info("🚧 Custom workflow builder coming in Day 3!")
+    """Custom workflow builder UI"""
+    st.markdown("### 🛠️ Custom Multi-Agent Workflow")
 
     st.markdown("""
-    **Planned features:**
-    - Drag-and-drop agent composer
-    - Dependency graph visualization
-    - Custom task parameters
-    - Workflow templates
+    Build a custom workflow by selecting agents and defining their tasks.
+    Agents will execute in the order specified, with each agent's output feeding into the next.
     """)
+
+    st.markdown("---")
+
+    # Agent selection
+    st.markdown("#### 1️⃣ Select Agents")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        use_research = st.checkbox("🔬 Research Agent", value=True, help="Gather and analyze information")
+    with col2:
+        use_compliance = st.checkbox("✅ Compliance Agent", value=False, help="Analyze controls and requirements")
+    with col3:
+        use_synthesis = st.checkbox("📝 Synthesis Agent", value=True, help="Generate reports and summaries")
+
+    if not (use_research or use_compliance or use_synthesis):
+        st.warning("⚠️ Select at least one agent to continue")
+        return
+
+    st.markdown("---")
+
+    # Task configuration
+    st.markdown("#### 2️⃣ Configure Tasks")
+
+    workflow_topic = st.text_input(
+        "Workflow Topic/Goal",
+        placeholder="e.g., Analyze our zero-trust implementation strategy",
+        help="What do you want the agents to accomplish?"
+    )
+
+    if use_research:
+        with st.expander("🔬 Research Agent Configuration"):
+            research_query = st.text_area(
+                "Research Query",
+                value=workflow_topic if workflow_topic else "",
+                placeholder="e.g., What are the key components of zero-trust architecture?",
+                height=80
+            )
+            research_depth = st.slider("Search Depth (hops)", 1, 5, 3)
+            research_sources = st.slider("Max Sources", 5, 30, 15)
+
+    if use_compliance:
+        with st.expander("✅ Compliance Agent Configuration"):
+            compliance_framework = st.selectbox("Framework", ["NIST-800-53", "NIST-800-171", "ISO-27001"])
+            compliance_threshold = st.slider("Evidence Threshold", 1, 5, 2)
+
+    if use_synthesis:
+        with st.expander("📝 Synthesis Agent Configuration"):
+            report_format = st.selectbox("Report Format", ["Executive Summary", "Technical Report", "Action Plan"])
+            include_citations = st.checkbox("Include Citations", value=True)
+
+    st.markdown("---")
+
+    # Execution
+    st.markdown("#### 3️⃣ Execute Workflow")
+
+    if not workflow_topic:
+        st.info("💡 Enter a workflow topic above to continue")
+        return
+
+    run_custom = st.button("🚀 Run Custom Workflow", type="primary")
+
+    if run_custom:
+        run_custom_workflow_execution(
+            use_research, use_compliance, use_synthesis,
+            workflow_topic,
+            research_query if use_research else None,
+            research_depth if use_research else None,
+            research_sources if use_research else None,
+            compliance_framework if use_compliance else None,
+            compliance_threshold if use_compliance else None,
+            report_format if use_synthesis else None,
+            include_citations if use_synthesis else None
+        )
+
+
+def run_custom_workflow_execution(
+    use_research, use_compliance, use_synthesis,
+    topic, research_query, research_depth, research_sources,
+    compliance_framework, compliance_threshold, report_format, include_citations
+):
+    """Execute custom multi-agent workflow"""
+
+    try:
+        # Initialize coordinator
+        sys.path.insert(0, 'src')
+        from agents.coordinator import AgentCoordinator, WorkflowStep
+        from agents.research_agent import ResearchAgent
+        from agents.compliance_agent import ComplianceAgent
+        from agents.synthesis_agent import SynthesisAgent
+
+        coordinator = AgentCoordinator()
+
+        # Build workflow steps
+        workflow_steps = []
+        previous_outputs = []
+
+        # Step 1: Research (if selected)
+        if use_research:
+            with st.spinner("🔬 Research Agent gathering information..."):
+                research_agent = ResearchAgent()
+                research_step = WorkflowStep(
+                    agent=research_agent,
+                    task_description=research_query or topic,
+                    parameters={
+                        "topic": research_query or topic,
+                        "depth": research_depth,
+                        "max_sources": research_sources
+                    }
+                )
+                workflow_steps.append(research_step)
+
+        # Step 2: Compliance (if selected)
+        if use_compliance:
+            with st.spinner("✅ Compliance Agent analyzing requirements..."):
+                compliance_agent = ComplianceAgent()
+                compliance_step = WorkflowStep(
+                    agent=compliance_agent,
+                    task_description=f"Analyze {compliance_framework} compliance for: {topic}",
+                    parameters={
+                        "framework": compliance_framework,
+                        "threshold": compliance_threshold,
+                        "topic": topic
+                    }
+                )
+                workflow_steps.append(compliance_step)
+
+        # Step 3: Synthesis (if selected)
+        if use_synthesis:
+            with st.spinner("📝 Synthesis Agent generating report..."):
+                synthesis_agent = SynthesisAgent()
+                synthesis_step = WorkflowStep(
+                    agent=synthesis_agent,
+                    task_description=f"Generate {report_format} for: {topic}",
+                    parameters={
+                        "format": report_format,
+                        "include_citations": include_citations,
+                        "topic": topic
+                    }
+                )
+                workflow_steps.append(synthesis_step)
+
+        # Execute workflow
+        st.success(f"✅ Executing {len(workflow_steps)}-agent workflow...")
+
+        results = coordinator.execute_workflow("Custom Workflow", workflow_steps)
+
+        # Display results
+        display_custom_workflow_results(results, use_research, use_compliance, use_synthesis)
+
+    except Exception as e:
+        st.error(f"❌ Workflow execution failed: {e}")
+        import traceback
+        st.code(traceback.format_exc())
+
+
+def display_custom_workflow_results(results, use_research, use_compliance, use_synthesis):
+    """Display results from custom workflow execution"""
+
+    st.markdown("---")
+    st.markdown("### 📊 Workflow Results")
+
+    # Show each agent's result
+    for i, result in enumerate(results):
+        agent_name = result.agent_name
+        status = "✅ Success" if result.success else "❌ Failed"
+
+        with st.expander(f"{i+1}. {agent_name} — {status}", expanded=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Execution Time", f"{result.execution_time:.2f}s")
+            with col2:
+                st.metric("Status", "Success" if result.success else "Failed")
+
+            if result.data:
+                st.json(result.data)
+
+            if result.errors:
+                st.error("Errors:")
+                for error in result.errors:
+                    st.write(f"- {error}")
+
+    st.success("✅ Custom workflow complete!")
